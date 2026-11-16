@@ -809,7 +809,21 @@ function fillEmoji() {
   });
   if (changed) save('todo');
 }
-function applyPacks() { applyTaskPack(); fillEmoji(); }
+/* Reprise des données de la version Claude, ajoutées une seule fois au premier lancement */
+const IMPORT_PACK = 'import-claude-2026-11-16';
+const IMPORT_DATA = {"tasks": [{"created": 1793882531379, "done": true, "doneAt": 1794317576352, "due": "2026-11-06", "emoji": "🍽️", "id": "1s90ycy8", "prio": 0, "title": "Manger parents"}, {"created": 1793886310703, "done": true, "doneAt": 1793886315275, "due": "", "emoji": "📌", "id": "oia4jxwd", "prio": 1, "title": "A"}, {"created": 1794318093145, "done": true, "doneAt": 1794779232370, "due": "2026-11-15", "emoji": "🍽️", "end": "15:30", "id": "csnh6lrh", "prio": 0, "time": "12:30", "title": "Louis dej chez moi"}, {"created": 1794320352905, "done": false, "due": "2026-11-22", "emoji": "♟️", "end": "18:30", "id": "dz0n66ru", "pack": "roi-r1", "time": "14:15", "title": "Critérium Roi · ronde 1"}, {"created": 1794320352906, "done": false, "due": "2026-11-29", "emoji": "♟️", "end": "19:00", "id": "ckvdhyo2", "pack": "n2-r4", "time": "14:00", "title": "Nationale 2 · ronde 4"}, {"created": 1794320352907, "done": false, "due": "2026-12-13", "emoji": "♟️", "end": "19:00", "id": "eopw6pu9", "pack": "n2-r5", "time": "14:00", "title": "Nationale 2 · ronde 5"}, {"created": 1794320352908, "done": false, "due": "2027-01-17", "emoji": "♟️", "end": "19:00", "id": "oiq6s4rz", "pack": "n2-r6", "time": "14:00", "title": "Nationale 2 · ronde 6"}, {"created": 1794320352909, "done": false, "due": "2027-01-31", "emoji": "♟️", "end": "19:00", "id": "xdkep6nk", "pack": "n2-r7", "time": "14:00", "title": "Nationale 2 · ronde 7"}, {"created": 1794320352910, "done": false, "due": "2027-03-13", "emoji": "♟️", "end": "19:00", "id": "mk5oz26v", "pack": "n2-r8", "time": "14:00", "title": "Nationale 2 · ronde 8"}, {"created": 1794320352911, "done": false, "due": "2027-03-14", "emoji": "♟️", "end": "19:00", "id": "zxveb4kq", "pack": "n2-r9", "time": "14:00", "title": "Nationale 2 · ronde 9"}, {"created": 1794320568377, "done": true, "doneAt": 1794694709288, "due": "2026-11-13", "emoji": "🍽️", "end": "14:00", "id": "uus8xgrn", "time": "12:00", "title": "Manger Antonin"}, {"created": 1794320760838, "done": true, "doneAt": 1794694709887, "due": "2026-11-13", "emoji": "🍫", "end": "", "id": "ar1hbg99", "time": "", "title": "Fondue chocolat"}, {"created": 1794321504426, "done": true, "doneAt": 1794779171454, "due": "2026-11-14", "emoji": "🎬", "end": "23:00", "id": "qyotadma", "time": "19:00", "title": "Théâtre"}, {"created": 1794321549610, "done": false, "due": "2027-05-20", "emoji": "📌", "end": "23:00", "id": "zwb7gh16", "time": "19:00", "title": "Ag copro"}, {"created": 1794561255243, "done": false, "due": "2026-12-20", "emoji": "📌", "end": "", "id": "98zq7lqw", "time": "", "title": "Depart Danemark"}, {"created": 1794561296811, "done": false, "due": "2027-01-01", "emoji": "📌", "end": "", "id": "tb1mzgae", "time": "", "title": "Retour Danemark"}, {"created": 1794561354245, "done": false, "due": "2026-12-01", "emoji": "💶", "end": "", "id": "u7k5598s", "time": "", "title": "Dépenser tickets resto"}, {"created": 1794694728569, "done": false, "due": "2026-11-21", "emoji": "📌", "end": "14:00", "id": "quq0s7pg", "time": "12:00", "title": "Clock tower"}], "activities": [{"color": 1, "goal": "Problèmes", "horizon": "long", "id": "m9hcys66", "name": "Échecs", "weight": 2}, {"color": 2, "goal": "", "horizon": "moyen", "id": "ubxcvelj", "name": "Code claude", "weight": 2}, {"color": 3, "goal": "", "horizon": "long", "id": "0il59653", "name": "Escalade", "weight": 1}], "gen": {"am": ["09:00", "12:00"], "days": [0, 1, 2, 3, 4], "pm": ["14:00", "17:00"]}};
+function applyImport() {
+  if (!state.known.todo || !state.known.planning || state.seeded.indexOf(IMPORT_PACK) !== -1) return;
+  if (!(localMode || dbBroken || (synced.todo && synced.planning))) return;
+  state.seeded.push(IMPORT_PACK);
+  if (state.seeded.indexOf(CHESS_TASKS_PACK) === -1) state.seeded.push(CHESS_TASKS_PACK);
+  state.tasks = state.tasks.filter(x => !x.ex).concat(IMPORT_DATA.tasks.filter(x => !state.tasks.some(y => y.id === x.id)));
+  state.events = state.events.filter(x => !x.ex);
+  state.activities = IMPORT_DATA.activities.map(a => Object.assign({}, a));
+  state.gen = Object.assign({}, IMPORT_DATA.gen);
+  save('todo'); save('planning');
+}
+function applyPacks() { applyImport(); applyTaskPack(); fillEmoji(); }
 
 function render() {
   applyPacks();
