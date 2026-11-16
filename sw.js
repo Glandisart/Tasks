@@ -1,5 +1,5 @@
 // Hors ligne : l'app est mise en cache au premier chargement. Incrémenter VERSION à chaque mise à jour.
-const VERSION = 'quotidien-v4';
+const VERSION = 'quotidien-v5';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
