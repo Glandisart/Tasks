@@ -748,12 +748,17 @@ function dueLabel(due) {
 }
 function groups() {
   const t = todayStr();
+  const d0 = fromYmd(t);
+  const monthEnd = ymd(new Date(d0.getFullYear(), d0.getMonth() + 1, 0));
   const open = state.tasks.filter(x => !x.done);
   const cmp = (a, b) => ((b.prio | 0) - (a.prio | 0)) || (((a.due || '9') < (b.due || '9')) ? -1 : ((a.due || '9') > (b.due || '9')) ? 1 : 0) || (a.created - b.created);
   return {
     late: open.filter(x => x.due && x.due < t).sort(cmp),
     today: open.filter(x => x.due === t).sort(cmp),
-    soon: open.filter(x => x.due && x.due > t).sort(cmp),
+    tomorrow: open.filter(x => x.due === ymd(addDays(fromYmd(t), 1))).sort(cmp),
+    days: [2, 3, 4, 5, 6].map(n => { const s = ymd(addDays(fromYmd(t), n)); return { date: s, items: open.filter(x => x.due === s).sort(cmp) }; }),
+    month: open.filter(x => x.due >= ymd(addDays(fromYmd(t), 7)) && x.due <= monthEnd).sort(cmp),
+    soon: open.filter(x => x.due > monthEnd && x.due >= ymd(addDays(fromYmd(t), 7))).sort(cmp),
     none: open.filter(x => !x.due).sort(cmp),
     done: state.tasks.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0))
   };
@@ -882,7 +887,9 @@ function taskRow(t) {
 function renderTasks() {
   const g = groups();
   const sec = (cls, title, arr) => arr.length ? '<section class="grp ' + cls + '"><h2 class="grp-h">' + title + '<span class="n">' + arr.length + '</span></h2><ul class="tasks">' + arr.map(taskRow).join('') + '</ul></section>' : '';
-  let html = sec('late', 'En retard', g.late) + sec('today', 'Aujourd\'hui', g.today) + sec('soon', 'À venir', g.soon) + sec('none', 'Sans date', g.none);
+  let html = sec('late', 'En retard', g.late) + sec('today', 'Aujourd\'hui', g.today) + sec('tomorrow', 'Demain', g.tomorrow) +
+    g.days.map(d => sec('day', fr(fromYmd(d.date), { weekday: 'long', day: 'numeric' }), d.items)).join('') +
+    sec('month', 'Ce mois-ci', g.month) + sec('soon', 'À venir', g.soon) + sec('none', 'Sans date', g.none);
   if (!html) {
     html = state.known.todo
       ? '<div class="empty"><p class="empty-t">Tout est fait.</p><p>Ajoute une tâche ci-dessus. Écrire « jeudi » ou « demain » dans le texte fixe l\'échéance.</p></div>'
