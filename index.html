@@ -181,6 +181,36 @@ input::placeholder{color:var(--muted)}
   .strip{display:flex}
 }
 
+/* Vue semaine complète (téléphone) : les 7 jours à la suite */
+.seg{display:none;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:2px;gap:2px}
+.seg button{min-height:34px;padding:0 14px;border:0;border-radius:8px;background:none;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.agenda{display:none;gap:10px;flex-direction:column}
+.ag-day{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ag-day.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.ag-day.past{opacity:.72}
+.ag-h{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;background:var(--surface-2);border:0;padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ag-day.today .ag-h{background:var(--accent-soft);color:var(--accent)}
+.ag-h .ag-dd{font-family:var(--f-mono);font-size:15px;letter-spacing:0;color:var(--ink);font-weight:500}
+.ag-day.today .ag-h .ag-dd{color:var(--accent)}
+.ag-h .ag-hol{margin-left:auto;font-size:11px;letter-spacing:0;text-transform:none;color:var(--warn);font-weight:600;text-align:right}
+.ag-list{list-style:none;margin:0;padding:6px 10px;display:flex;flex-direction:column;gap:4px}
+.ag-list .tk{display:flex;align-items:flex-start;gap:10px;min-height:36px;padding:2px 0;border:0;background:none;font-size:15px;line-height:1.3}
+.ag-list .tk-box{width:20px;height:20px;margin-top:7px}
+.ag-list .tk-t{background:none;border:0;padding:6px 0;text-align:left;font-size:15px;color:var(--ink);flex:1;min-width:0}
+.ag-list .tk.done .tk-t{text-decoration:line-through;color:var(--muted)}
+.ag-list .tk.late .tk-time{color:var(--danger)}
+.ag-ev{display:flex;flex-direction:column;gap:1px;width:100%;text-align:left;border:0;border-radius:8px;padding:6px 10px;background:var(--eb);color:var(--ef);min-width:0}
+.ag-ev.gen{background:none;border:1.5px dashed var(--ef)}
+.ag-ev .ev-t{font-size:14px}
+.ag-ev .ev-m{font-size:11.5px}
+.ag-empty{color:var(--muted);font-size:13px;padding:6px 2px}
+@media (max-width:899px){
+  .seg{display:inline-flex}
+  #view-semaine.mode-liste .agenda{display:flex}
+  #view-semaine.mode-liste #strip,#view-semaine.mode-liste #timetable,#view-semaine.mode-liste #wk-add{display:none}
+}
+
 /* Fenêtres */
 .overlay{position:fixed;inset:0;z-index:50;background:rgba(8,14,11,.55);display:flex;align-items:flex-end;justify-content:center;
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
@@ -312,6 +342,7 @@ input::placeholder{color:var(--muted)}
           <h2 id="wk-label" class="wk-label"></h2>
           <button type="button" class="icon-btn" id="wk-next" aria-label="Semaine suivante"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button>
         </div>
+        <div class="seg" id="wk-mode" role="group" aria-label="Affichage"><button type="button" data-mode="liste" aria-pressed="true">Semaine</button><button type="button" data-mode="jour" aria-pressed="false">Jour</button></div>
         <div class="wk-actions">
           <button type="button" class="btn" id="wk-today">Aujourd'hui</button>
           <button type="button" class="btn" id="wk-fill">Remplir la semaine</button>
@@ -319,6 +350,7 @@ input::placeholder{color:var(--muted)}
         </div>
       </div>
       <div id="strip" class="strip"></div>
+      <div id="agenda" class="agenda"></div>
       <div id="timetable" class="tt"></div>
     </section>
     <section id="view-activites" aria-label="Activités" hidden>
@@ -595,7 +627,7 @@ const state = {
   tab: 'taches',
   tasks: [], events: [],
   known: { todo: false, planning: false },
-  selDay: dow(new Date()), weekOffset: 0,
+  selDay: dow(new Date()), weekOffset: 0, wkMode: (function () { try { return localStorage.getItem('qd.v1.wkmode') === 'jour' ? 'jour' : 'liste'; } catch (e) { return 'liste'; } })(),
   showDone: false, qaPrio: false,
   activities: [], gen: defaultGen(), seeded: []
 };
@@ -968,6 +1000,36 @@ function renderWeek() {
     bArr.push('<div class="' + cc + (hn ? ' hol' : '') + ' col-b" data-day="' + i + '" data-minh="' + minH + '" style="height:' + bodyH + 'px">' + evh + '</div>');
   });
   $('#timetable').innerHTML = hArr.join('') + tArr.join('') + bArr.join('');
+  renderAgenda(days, byDay, tStr);
+}
+
+/* Les sept jours à la suite : tâches du jour sans heure d'abord, puis tout par heure */
+const DAY_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+function renderAgenda(days, byDay, tStr) {
+  const view = $('#view-semaine');
+  view.classList.toggle('mode-liste', state.wkMode === 'liste');
+  $('#wk-mode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === state.wkMode)));
+  $('#agenda').innerHTML = days.map((d, i) => {
+    const s = ymd(d);
+    const items = [];
+    state.tasks.filter(tk => tk.due === s || (s === tStr && !tk.done && tk.due && tk.due < tStr)).forEach(tk => items.push({ k: 't', at: tk.time ? toMin(tk.time) : -1, tk }));
+    byDay[i].forEach(e => items.push({ k: 'e', at: toMin(e.start), e }));
+    items.sort((a, b) => (a.at - b.at) || ((a.k === 't' ? 0 : 1) - (b.k === 't' ? 0 : 1)));
+    const rows = items.map(it => {
+      if (it.k === 't') {
+        const tk = it.tk, late = !tk.done && tk.due < tStr;
+        return '<li class="tk' + (tk.done ? ' done' : '') + (late ? ' late' : '') + '">' +
+          '<button type="button" class="tk-box" data-tk-toggle="' + tk.id + '" aria-pressed="' + (tk.done ? 'true' : 'false') + '" aria-label="' + (tk.done ? 'Rouvrir' : 'Terminer') + ' : ' + esc(tk.title) + '"></button>' +
+          '<button type="button" class="tk-t" data-tk-edit="' + tk.id + '">' + (tk.time ? '<span class="tk-time">' + tk.time + '</span> ' : '') + esc((tk.emoji ? tk.emoji + ' ' : '') + tk.title) + (late ? ' <span class="tk-time">· ' + esc(dueLabel(tk.due)) + '</span>' : '') + '</button></li>';
+      }
+      const e = it.e;
+      return '<li><button type="button" class="ag-ev c' + (e.color || 1) + (e.gen ? ' gen' : '') + '" data-ev="' + e.id + '"><span class="ev-t">' + esc(e.title) + '</span><span class="ev-m">' + e.start + '–' + e.end + (e.place ? ' · ' + esc(e.place) : '') + '</span></button></li>';
+    }).join('');
+    const hn = holidayOf(s);
+    return '<section class="ag-day' + (s === tStr ? ' today' : '') + (s < tStr ? ' past' : '') + '">' +
+      '<button type="button" class="ag-h" data-goto-day="' + i + '" aria-label="Voir ' + DAY_FULL[i].toLowerCase() + ' ' + d.getDate() + ' en détail"><span>' + DAY_FULL[i] + '</span><span class="ag-dd">' + d.getDate() + '</span>' + (hn ? '<span class="ag-hol">' + esc(hn) + '</span>' : '') + '</button>' +
+      '<ul class="ag-list">' + (rows || '<li class="ag-empty">Rien de prévu</li>') + '</ul></section>';
+  }).join('');
 }
 
 /* ---------- Fenêtres (feuilles) ---------- */
@@ -1409,7 +1471,7 @@ $('#strip').addEventListener('click', ev => {
   const b = ev.target.closest('[data-sel]');
   if (b) { state.selDay = Number(b.dataset.sel); renderWeek(); }
 });
-$('#timetable').addEventListener('click', ev => {
+function wkClick(ev) {
   const tg = ev.target.closest('[data-tk-toggle]');
   if (tg) {
     const t = state.tasks.find(x => x.id === tg.dataset.tkToggle);
@@ -1429,6 +1491,19 @@ $('#timetable').addEventListener('click', ev => {
     const ws = addDays(weekStart(new Date()), state.weekOffset * 7);
     openEventSheet(null, { day: i, date: ymd(addDays(ws, i)), start: pad(h) + ':00', end: pad(h + 1) + ':00' });
   }
+}
+$('#timetable').addEventListener('click', wkClick);
+$('#agenda').addEventListener('click', ev => {
+  const g = ev.target.closest('[data-goto-day]');
+  if (g) { state.selDay = Number(g.dataset.gotoDay); state.wkMode = 'jour'; try { localStorage.setItem('qd.v1.wkmode', 'jour'); } catch (e) {} renderWeek(); return; }
+  wkClick(ev);
+});
+$('#wk-mode').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-mode]');
+  if (!b) return;
+  state.wkMode = b.dataset.mode;
+  try { localStorage.setItem('qd.v1.wkmode', state.wkMode); } catch (e) {}
+  renderWeek();
 });
 
 /* Effacer les exemples */
